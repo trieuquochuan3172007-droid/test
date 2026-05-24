@@ -1,0 +1,406 @@
+.page-bg {
+    -fx-background-color: #0f172a; /* Nền tối tổng thể */
+}
+
+.hero-panel {
+    -fx-padding: 30 24 30 24;
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 18;
+}
+
+.brand-title {
+    -fx-text-fill: white;
+    -fx-font-size: 38px;
+    -fx-font-weight: 800;
+}
+
+.hero-subtitle {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 15px;
+}
+
+.info-card {
+    -fx-background-color: #334155;
+    -fx-background-radius: 12;
+    -fx-padding: 12;
+}
+
+.info-value {
+    -fx-text-fill: white;
+    -fx-font-size: 18px;
+    -fx-font-weight: 700;
+}
+
+.info-label {
+    -fx-text-fill: #cbd5e1;
+    -fx-font-size: 12px;
+}
+
+.form-panel {
+    -fx-padding: 26;
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 18;
+}
+
+.panel-title {
+    -fx-text-fill: white;
+    -fx-font-size: 28px;
+    -fx-font-weight: 800;
+}
+
+.panel-subtitle {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 13px;
+}
+
+.field-label {
+    -fx-text-fill: #cbd5e1;
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+}
+
+.text-input, .text-area, .combo-box {
+    -fx-background-color: #0f172a;
+    -fx-border-color: #334155;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-padding: 10 14 10 14;
+    -fx-font-size: 14px;
+    -fx-text-fill: white;
+    -fx-prompt-text-fill: #64748b;
+}
+
+.text-input:focused, .text-area:focused, .combo-box:focused {
+    -fx-border-color: #10b981;
+}
+
+/* Các nút bấm hài hòa màu xanh ngọc (Dark Mode) */
+.btn-primary {
+    -fx-background-color: #10b981;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+    -fx-background-radius: 20; /* Bo tròn theo VPA */
+    -fx-cursor: hand;
+    -fx-padding: 10 24 10 24;
+}
+
+.btn-primary:hover {
+    -fx-background-color: #059669;
+}
+
+.btn-success {
+    -fx-background-color: #10b981;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+    -fx-background-radius: 20;
+    -fx-cursor: hand;
+    -fx-padding: 10 24 10 24;
+}
+
+.btn-success:hover {
+    -fx-background-color: #059669;
+}
+
+.btn-secondary {
+    -fx-background-color: #334155;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+    -fx-background-radius: 20;
+    -fx-cursor: hand;
+    -fx-padding: 8 20 8 20;
+}
+
+.btn-secondary:hover {
+    -fx-background-color: #475569;
+}
+
+.btn-danger {
+    -fx-background-color: #ef4444;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+    -fx-background-radius: 20;
+    -fx-cursor: hand;
+    -fx-padding: 8 20 8 20;
+}
+
+.link-inline {
+    -fx-text-fill: #10b981;
+    -fx-font-size: 13px;
+}
+
+.error-label {
+    -fx-text-fill: #f87171;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
+/* Header */
+.main-header {
+    -fx-background-color: #0f172a;
+    -fx-padding: 16 24 16 24;
+    -fx-border-color: #1e293b;
+    -fx-border-width: 0 0 1 0;
+}
+
+.header-title {
+    -fx-text-fill: white;
+    -fx-font-size: 24px;
+    -fx-font-weight: 800;
+}
+
+.header-user {
+    -fx-text-fill: #cbd5e1;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+}
+
+.main-content {
+    -fx-padding: 24;
+}
+
+/* Cards (Trạng thái) */
+.stat-card {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 14;
+    -fx-padding: 16;
+}
+
+.stat-title {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.stat-value {
+    -fx-text-fill: white;
+    -fx-font-size: 20px;
+    -fx-font-weight: 800;
+}
+
+.stat-desc {
+    -fx-text-fill: #cbd5e1;
+    -fx-font-size: 12px;
+}
+
+.section-title {
+    -fx-text-fill: white;
+    -fx-font-size: 18px;
+    -fx-font-weight: 800;
+}
+
+/* TableView (Bảng đấu giá) */
+.auction-table {
+    -fx-background-color: #0f172a;
+    -fx-border-color: #1e293b;
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+}
+
+.auction-table .column-header-background {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 12 12 0 0;
+}
+
+.auction-table .column-header {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent #334155 transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 12 0 12 0;
+}
+
+.auction-table .column-header .label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-weight: 700;
+}
+
+.auction-table .table-row-cell {
+    -fx-background-color: #0f172a;
+    -fx-border-color: #1e293b;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 4 0 4 0;
+}
+
+.auction-table .table-row-cell:odd {
+    -fx-background-color: #111827;
+}
+
+.auction-table .table-row-cell:selected {
+    -fx-background-color: #1e293b;
+}
+
+.auction-table .table-cell {
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-alignment: center-left;
+    -fx-padding: 8 16 8 16;
+}
+
+.empty-hint {
+    -fx-text-fill: #64748b;
+    -fx-font-size: 14px;
+}
+
+.main-footer {
+    -fx-padding: 16 24 16 24;
+    -fx-background-color: #0f172a;
+    -fx-border-color: #1e293b;
+    -fx-border-width: 1 0 0 0;
+}
+
+/* Login Page */
+.login-page {
+    -fx-background-color: #0f172a;
+}
+
+.login-info-panel {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 28;
+    -fx-padding: 28;
+    -fx-pref-width: 420;
+}
+
+.login-info-panel .brand-title {
+    -fx-text-fill: #10b981;
+    -fx-font-size: 36px;
+}
+
+.login-info-panel .hero-subtitle {
+    -fx-text-fill: #cbd5e1;
+}
+
+.login-info-card {
+    -fx-background-color: #334155;
+    -fx-background-radius: 16;
+    -fx-padding: 16;
+}
+
+.login-form-card {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 30;
+    -fx-padding: 30;
+    -fx-pref-width: 420;
+}
+
+.login-form-card .form-title {
+    -fx-text-fill: white;
+}
+
+.login-form-card .form-subtitle {
+    -fx-text-fill: #94a3b8;
+}
+
+.login-decorative-line {
+    -fx-background-color: #10b981;
+    -fx-pref-height: 4;
+    -fx-background-radius: 999;
+}
+
+.form-page {
+    -fx-padding: 28;
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 22;
+}
+
+.form-title {
+    -fx-font-size: 26px;
+    -fx-font-weight: 800;
+    -fx-text-fill: white;
+}
+
+.form-subtitle {
+    -fx-font-size: 14px;
+    -fx-text-fill: #94a3b8;
+}
+
+/* Phòng đấu giá (Auction Room) */
+.chart-panel {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 18;
+    -fx-padding: 18;
+}
+
+.chart-panel .label {
+    -fx-text-fill: white;
+}
+
+.status-card {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 16;
+    -fx-padding: 18;
+    -fx-border-color: #334155;
+    -fx-border-radius: 16;
+}
+
+.timer-card {
+    -fx-background-color: #334155;
+    -fx-background-radius: 16;
+}
+
+.winner-card {
+    -fx-background-color: #064e3b;
+    -fx-background-radius: 16;
+}
+
+.auction-room-header {
+    -fx-background-color: #0f172a;
+    -fx-padding: 18 24 18 24;
+    -fx-border-color: #1e293b;
+    -fx-border-width: 0 0 1 0;
+}
+
+.auction-room-header .header-title {
+    -fx-text-fill: white;
+    -fx-font-size: 22px;
+    -fx-font-weight: 800;
+}
+
+.auction-room-actions {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 16;
+    -fx-padding: 18;
+    -fx-alignment: center;
+}
+
+.auction-room-actions .label {
+    -fx-text-fill: white;
+}
+
+.auction-room-actions .btn-primary,
+.auction-room-actions .btn-secondary,
+.auction-room-actions .btn-danger {
+    -fx-min-width: 180px;
+}
+
+/* Các nhãn trạng thái trong FXML nếu có */
+.status-running {
+    -fx-background-color: #064e3b;
+    -fx-text-fill: #34d399;
+}
+
+.status-open {
+    -fx-background-color: #1e3a8a;
+    -fx-text-fill: #60a5fa;
+}
+
+.status-finished {
+    -fx-background-color: #7f1d1d;
+    -fx-text-fill: #f87171;
+}
+
+/* Biểu đồ */
+.chart-plot-background {
+    -fx-background-color: transparent;
+}
+.chart-vertical-grid-lines, .chart-horizontal-grid-lines {
+    -fx-stroke: #334155;
+}
+.axis {
+    -fx-tick-label-fill: #94a3b8;
+}
+.axis-tick-mark, .axis-minor-tick-mark {
+    -fx-stroke: transparent;
+}
