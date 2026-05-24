@@ -1,0 +1,114 @@
+name: CI — Auction System
+
+on:
+  push:
+    branches: [ main, master, "feature/**", "fix/**" ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: Kien2007zz@
+          MYSQL_DATABASE: auction_system
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -p$MYSQL_ROOT_PASSWORD --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      # Ghi đè TOÀN BỘ file (tránh lỗi conflict markers còn sót)
+      - name: Patch application.properties
+        run: |
+          cat > src/main/resources/config/application.properties << EOF
+          # MySQL Connection configurations
+          db.url=jdbc:mysql://127.0.0.1:3306/auction_system?allowPublicKeyRetrieval=true&useSSL=false
+          db.username=root
+          db.password=Kien2007zz@
+          EOF
+          echo "[CI] application.properties:"
+          cat src/main/resources/config/application.properties
+
+      - name: Init database schema
+        env:
+          MYSQL_PWD: Kien2007zz@
+        run: |
+          mysql -h 127.0.0.1 -u root auction_system << 'SQL'
+          CREATE TABLE IF NOT EXISTS users (
+            id          VARCHAR(50)  PRIMARY KEY,
+            username    VARCHAR(50)  NOT NULL UNIQUE,
+            password    VARCHAR(255) NOT NULL,
+            full_name   VARCHAR(100) NOT NULL,
+            email       VARCHAR(100) NOT NULL UNIQUE,
+            role        VARCHAR(20)  NOT NULL,
+            balance     DOUBLE       DEFAULT 0
+          );
+          CREATE TABLE IF NOT EXISTS items (
+            id          VARCHAR(50)  PRIMARY KEY,
+            name        VARCHAR(100) NOT NULL,
+            description TEXT,
+            init_price  DOUBLE       NOT NULL,
+            category    VARCHAR(50)  NOT NULL
+          );
+          CREATE TABLE IF NOT EXISTS auction_sessions (
+            auction_id          VARCHAR(50) PRIMARY KEY,
+            item_id             VARCHAR(50) NOT NULL,
+            seller_id           VARCHAR(50) NOT NULL,
+            start_time          DATETIME    NOT NULL,
+            end_time            DATETIME    NOT NULL,
+            status              VARCHAR(20) NOT NULL,
+            winner_id           VARCHAR(50),
+            current_highest_bid DOUBLE      DEFAULT 0
+          );
+          CREATE TABLE IF NOT EXISTS bid_transactions (
+            id          INT AUTO_INCREMENT PRIMARY KEY,
+            auction_id  VARCHAR(50) NOT NULL,
+            bidder_id   VARCHAR(50) NOT NULL,
+            bid_amount  DOUBLE      NOT NULL,
+            bid_time    DATETIME    NOT NULL
+          );
+          SQL
+          echo "[CI] Schema khởi tạo xong"
+
+      - name: Compile
+        run: mvn compile --no-transfer-progress
+
+      - name: Test
+        run: mvn test --no-transfer-progress
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: target/surefire-reports/
+          retention-days: 14
+
+      - name: Package JAR
+        run: mvn package -DskipTests --no-transfer-progress
+
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: auction-system-${{ github.sha }}
+          path: target/*.jar
+          retention-days: 30
