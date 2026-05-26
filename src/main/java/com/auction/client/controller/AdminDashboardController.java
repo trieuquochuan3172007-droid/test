@@ -11,13 +11,27 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+
+/**
+ * Controller màn hình quản trị viên.
+ *
+ * <p>Admin có thể:
+ * <ul>
+ *   <li>Xem danh sách toàn bộ phiên đấu giá (LIST_DETAIL)</li>
+ *   <li>Xem thống kê: tổng phiên, đang chạy, đã kết thúc</li>
+ *   <li>Đóng cưỡng bức bất kỳ phiên nào (CLOSE_SESSION)</li>
+ * </ul>
+ * </p>
+ */
 public class AdminDashboardController {
 
-    @FXML private Label lblWelcome;
+    @FXML private Label               lblWelcome;
     @FXML private TableView<AuctionRow> auctionTable;
-    @FXML private Label lblTotalSessions;
-    @FXML private Label lblRunning;
-    @FXML private Label lblFinished;
+    @FXML private Label               lblTotalSessions;
+    @FXML private Label               lblRunning;
+    @FXML private Label               lblFinished;
 
     private final ObservableList<AuctionRow> auctionData = FXCollections.observableArrayList();
 
@@ -28,67 +42,112 @@ public class AdminDashboardController {
             lblWelcome.setText("Quản trị viên: " + user.getFullName());
         }
         auctionTable.setItems(auctionData);
-        loadData();
+        loadDataAsync();
     }
 
-    private void loadData() {
+    // -------------------------------------------------------------------------
+    // Load dữ liệu — dùng LIST_DETAIL (1 lần call)
+    // -------------------------------------------------------------------------
+    private void loadDataAsync() {
         new Thread(() -> {
-            String response = NetworkClient.getInstance().sendRequest("LIST");
+            String response = NetworkClient.getInstance().sendRequest("LIST_DETAIL");
             Platform.runLater(() -> {
                 auctionData.clear();
-                if (response == null || !response.startsWith("DANH_SACH")) return;
+                if (response == null || !response.startsWith("DANH_SACH_CHI_TIET")) return;
 
                 String[] entries = response.split("\\|");
                 int stt = 1, running = 0, finished = 0;
+
                 for (int i = 1; i < entries.length; i++) {
                     if ("trong".equalsIgnoreCase(entries[i])) break;
-                    String[] p = entries[i].split(":");
-                    if (p.length != 3) continue;
+                    // Format: id:itemName:price:status:endTime
+                    String[] p = entries[i].split(":", 5);
+                    if (p.length < 4) continue;
 
-                    String status = p[2];
+                    String status = p[3];
                     if ("RUNNING".equals(status) || "EXTENDED".equals(status)) running++;
-                    if ("FINISHED".equals(status)) finished++;
+                    if ("FINISHED".equals(status) || "PAID".equals(status))     finished++;
 
-                    auctionData.add(new AuctionRow(stt++, p[0], p[0],
-                            parseDouble(p[1]), 0, status, ""));
+                    double price      = parseDouble(p[2]);
+                    String endTimeStr = (p.length > 4) ? p[4] : "";
+                    String timeRemaining = formatTimeRemaining(endTimeStr);
+                    auctionData.add(new AuctionRow(stt++, p[0], p[1], price, 0, status, endTimeStr, timeRemaining));
                 }
-                lblTotalSessions.setText(String.valueOf(auctionData.size()));
-                lblRunning.setText(String.valueOf(running));
-                lblFinished.setText(String.valueOf(finished));
+
+                if (lblTotalSessions != null) lblTotalSessions.setText(String.valueOf(auctionData.size()));
+                if (lblRunning       != null) lblRunning.setText(String.valueOf(running));
+                if (lblFinished      != null) lblFinished.setText(String.valueOf(finished));
             });
         }).start();
     }
+
+    // -------------------------------------------------------------------------
+    // Event Handlers
+    // -------------------------------------------------------------------------
 
     @FXML
     void handleForceClose(ActionEvent event) {
         AuctionRow selected = auctionTable.getSelectionModel().getSelectedItem();
         if (selected == null) {
-            showAlert("Chưa chọn phiên", "Vui lòng chọn một phiên để đóng.");
+            showAlert(Alert.AlertType.WARNING, "Chưa chọn phiên",
+                    "Vui lòng chọn một phiên đấu giá để đóng.");
             return;
         }
-        // Gửi lệnh đóng — server cần handle lệnh CLOSE_SESSION (thêm ở bước sau nếu muốn)
-        showAlert("Thành công", "Đã gửi lệnh đóng phiên: " + selected.getAuctionId());
-        loadData();
+
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Đóng phiên [" + selected.getAuctionId() + "] — " + selected.getItemName() + "?",
+                ButtonType.YES, ButtonType.NO);
+        confirm.setTitle("Xác nhận đóng phiên");
+        confirm.showAndWait().ifPresent(btn -> {
+            if (btn == ButtonType.YES) {
+                String response = NetworkClient.getInstance()
+                        .sendRequest("CLOSE_SESSION|" + selected.getAuctionId());
+                if (response != null && response.startsWith("CLOSE_SESSION_SUCCESS")) {
+                    showAlert(Alert.AlertType.INFORMATION, "Thành công",
+                            "Đã đóng phiên: " + selected.getAuctionId());
+                    loadDataAsync();
+                } else {
+                    String msg = (response != null && response.contains("|"))
+                            ? response.split("\\|", 2)[1] : "Không thể đóng phiên.";
+                    showAlert(Alert.AlertType.ERROR, "Lỗi", msg);
+                }
+            }
+        });
     }
 
     @FXML
     void handleRefresh(ActionEvent event) {
-        loadData();
+        loadDataAsync();
     }
 
     @FXML
     void handleLogout(ActionEvent event) {
-        UserManager.getInstance().setCurrentUser(null);
+        UserManager.getInstance().logout();
         SceneUtil.changeScene(event, "Login.fxml", "Đăng nhập");
     }
 
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
     private double parseDouble(String s) {
         try { return Double.parseDouble(s); } catch (Exception e) { return 0; }
     }
 
-    private void showAlert(String title, String msg) {
-        Alert a = new Alert(Alert.AlertType.INFORMATION);
-        a.setTitle(title); a.setHeaderText(null); a.setContentText(msg);
-        a.showAndWait();
+    private String formatTimeRemaining(String endTimeStr) {
+        if (endTimeStr == null || endTimeStr.isBlank()) return "00:00:00";
+        try {
+            LocalDateTime end = LocalDateTime.parse(endTimeStr);
+            long secs = Duration.between(LocalDateTime.now(), end).getSeconds();
+            if (secs <= 0) return "Đã kết thúc";
+            return String.format("%02d:%02d:%02d", secs / 3600, (secs % 3600) / 60, secs % 60);
+        } catch (Exception e) { return "00:00:00"; }
+    }
+
+    private void showAlert(Alert.AlertType type, String title, String msg) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(msg);
+        alert.showAndWait();
     }
 }

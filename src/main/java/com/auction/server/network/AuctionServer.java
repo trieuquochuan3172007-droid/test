@@ -4,6 +4,7 @@ import com.auction.domain.AuctionManager;
 import com.auction.server.util.DatabaseUtil;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.sql.Connection;
@@ -11,38 +12,58 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
+/**
+ * Server lắng nghe kết nối TCP từ các client đấu giá.
+ *
+ * <p>Mỗi client được phục vụ bởi một thread riêng từ fixed thread pool (50 threads).
+ * Sử dụng {@link AuctionManager} singleton để quản lý tất cả phiên đấu giá.</p>
+ */
 public class AuctionServer {
+
     public static final int DEFAULT_PORT = 9999;
 
-    private final int port;
-    private final Set<ClientHandler> clients = Collections.synchronizedSet(new HashSet<>());
-    private final ExecutorService threadPool = Executors.newFixedThreadPool(50);
+    private final int          port;
+    private final Set<ClientHandler> clients    = Collections.synchronizedSet(new HashSet<>());
+    private final ExecutorService    threadPool = Executors.newFixedThreadPool(50);
 
     public AuctionServer(int port) {
         this.port = port;
     }
 
+    // -------------------------------------------------------------------------
+    // Khởi động server
+    // -------------------------------------------------------------------------
     public void start() throws IOException {
-        initializeDatabase();  // Khởi tạo database
+        initializeDatabase();
         seedDemoData();
-        
-        // Thêm shutdown hook để lưu dữ liệu khi server tắt
+
+        // Shutdown hook: lưu data và tắt pool sạch sẽ
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("[MÁY CHỦ] ⚠️ Server đang tắt, lưu dữ liệu...");
+            System.out.println("[SERVER] ⚠ Đang tắt — lưu dữ liệu...");
             AuctionManager.getInstance().persistAllSessions();
             threadPool.shutdown();
-            System.out.println("[MÁY CHỦ] ✓ Dữ liệu đã được lưu");
-        }));
-        
+            try {
+                if (!threadPool.awaitTermination(5, TimeUnit.SECONDS)) {
+                    threadPool.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                threadPool.shutdownNow();
+            }
+            DatabaseUtil.getInstance().shutdown();
+            System.out.println("[SERVER] ✓ Đã tắt an toàn.");
+        }, "shutdown-hook"));
+
         try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("[MÁY CHỦ] Đang lắng nghe ở cổng " + port);
-            while (true) {
+            System.out.println("[SERVER] ✓ Đang lắng nghe ở cổng " + port);
+            while (!Thread.currentThread().isInterrupted()) {
                 Socket clientSocket = serverSocket.accept();
-                System.out.println("[MÁY CHỦ] Client kết nối: " + clientSocket.getRemoteSocketAddress());
+                System.out.println("[SERVER] Client kết nối: " + clientSocket.getRemoteSocketAddress());
                 ClientHandler handler = new ClientHandler(clientSocket, this);
                 clients.add(handler);
                 threadPool.execute(handler);
@@ -50,6 +71,9 @@ public class AuctionServer {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Broadcast tới tất cả clients
+    // -------------------------------------------------------------------------
     public void broadcast(String message) {
         synchronized (clients) {
             for (ClientHandler client : clients) {
@@ -62,114 +86,148 @@ public class AuctionServer {
         clients.remove(handler);
     }
 
+    // -------------------------------------------------------------------------
+    // Dữ liệu mẫu cho demo
+    // -------------------------------------------------------------------------
     private void seedDemoData() {
         AuctionManager manager = AuctionManager.getInstance();
-        // Chỉ seed nếu chưa có phiên A1 (tránh tạo trùng)
-        if (manager.getSession("A1") != null) {
-            System.out.println("[MÁY CHỦ] Phiên mẫu A1 đã tồn tại, bỏ qua seed.");
+        com.auction.domain.AuctionSession a1 = manager.getSession("A1");
+        if (a1 != null) {
+            System.out.println("[SERVER] Làm mới thời gian cho phiên mẫu A1.");
+            a1.setStartTime(java.time.LocalDateTime.now());
+            a1.setEndTime(java.time.LocalDateTime.now().plusMinutes(60));
+            a1.setStatus(com.auction.domain.AuctionStatus.RUNNING);
+            // Cập nhật vào DB
+            try { new com.auction.server.dao.AuctionDAO().saveSession(a1); } catch (Exception ignored) {}
             return;
         }
         try {
-            // Insert item mẫu vào DB trước
             com.auction.server.dao.ItemDAO itemDAO = new com.auction.server.dao.ItemDAO();
             if (itemDAO.findById("ITEM1") == null) {
-                com.auction.common.models.Item demoItem =
-                    new com.auction.common.models.Electronics("ITEM1", "Laptop Demo", "Laptop mẫu cho demo", 500.0, "ELECTRONICS", "", "", "");
-                itemDAO.saveItem(demoItem);
+                itemDAO.saveItem(com.auction.common.pattern.ItemFactory.createElectronics(
+                        "ITEM1", "Laptop Demo", "Laptop mẫu cho demo",
+                        500.0, "DemoTech", "X1", "SN-001", "2027-01-01"));
             }
-            // Insert seller mẫu vào DB trước
+
             com.auction.server.dao.UserDAO userDAO = new com.auction.server.dao.UserDAO();
             if (userDAO.getUserByUsername("SELLER1") == null) {
-                com.auction.common.models.User demoSeller =
-                    new com.auction.common.models.Seller("SELLER1", "SELLER1", "seller123", "Seller Demo", "seller@demo.com");
-                userDAO.saveUser(demoSeller);
+                userDAO.saveUser(new com.auction.common.models.Seller(
+                        "SELLER1", "SELLER1", "seller123", "Seller Demo", "seller@demo.com"));
             }
         } catch (Exception e) {
-            System.err.println("[MÁY CHỦ] Lỗi seed dữ liệu mẫu: " + e.getMessage());
+            System.err.println("[SERVER] Lỗi seed dữ liệu: " + e.getMessage());
         }
+
         if (manager.createSession("A1", "ITEM1", "Laptop Demo", "SELLER1", 500.0, 60)) {
             manager.startSession("A1");
-            System.out.println("[MÁY CHỦ] Đã tạo phiên mẫu A1.");
+            System.out.println("[SERVER] ✓ Đã tạo phiên mẫu A1.");
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Khởi tạo Database — đọc credentials từ application.properties
+    // -------------------------------------------------------------------------
     private void initializeDatabase() {
-    try {
-        // 1. Kết nối thẳng vào MySQL server root (không chỉ định database nào cả)
-        // Lưu ý: Cậu cần đảm bảo username/pass ở đây khớp với máy cậu
-        String rootUrl = "jdbc:mysql://localhost:3306/?useSSL=false&serverTimezone=UTC";
-        Connection conn = java.sql.DriverManager.getConnection(rootUrl, "root", ""); 
-        
-        Statement stmt = conn.createStatement();
-        
-        // 2. Tạo database
-        stmt.executeUpdate("CREATE DATABASE IF NOT EXISTS auction_system");
-        System.out.println("[MÁY CHỦ] Đã kiểm tra/tạo database 'auction_system'");
-        stmt.close();
-        conn.close(); // Đóng kết nối root sau khi tạo xong
-        
-        // 3. Bây giờ mới dùng DatabaseUtil để kết nối vào auction_system và tạo bảng
-        Connection dbConn = DatabaseUtil.getInstance().getConnection(); // Lúc này DatabaseUtil sẽ kết nối vào db đã tồn tại
-        Statement dbStmt = dbConn.createStatement();
-        
-        // Tạo bảng (Code tạo bảng của cậu giữ nguyên ở đây)
-        dbStmt.executeUpdate("CREATE TABLE IF NOT EXISTS users (" +
-            "id VARCHAR(50) PRIMARY KEY," +
-            "username VARCHAR(50) NOT NULL UNIQUE," +
-            "password VARCHAR(255) NOT NULL," +
-            "full_name VARCHAR(100) NOT NULL," +
-            "email VARCHAR(100) NOT NULL UNIQUE," +
-            "role VARCHAR(20) NOT NULL," +
-            "balance DOUBLE DEFAULT 0" +
-        ")");
-            
-            // Tạo bảng items
-        dbStmt.executeUpdate("CREATE TABLE IF NOT EXISTS items (" +
-            "id VARCHAR(50) PRIMARY KEY," +
-            "name VARCHAR(100) NOT NULL," +
-            "description TEXT," +
-            "init_price DOUBLE NOT NULL," +
-            "category VARCHAR(50) NOT NULL" +
-        ")");
-        
-        // Tạo bảng auction_sessions (không có FK để tránh lỗi khi seed/test)
-        dbStmt.executeUpdate("CREATE TABLE IF NOT EXISTS auction_sessions (" +
-            "auction_id VARCHAR(50) PRIMARY KEY," +
-            "item_id VARCHAR(50) NOT NULL," +
-            "seller_id VARCHAR(50) NOT NULL," +
-            "start_time DATETIME NOT NULL," +
-            "end_time DATETIME NOT NULL," +
-            "status VARCHAR(20) NOT NULL," +
-            "winner_id VARCHAR(50)," +
-            "current_highest_bid DOUBLE DEFAULT 0" +
-        ")");
-        
-        // Tạo bảng bid_transactions (không có FK để tránh lỗi)
-        dbStmt.executeUpdate("CREATE TABLE IF NOT EXISTS bid_transactions (" +
-            "id INT AUTO_INCREMENT PRIMARY KEY," +
-            "auction_id VARCHAR(50) NOT NULL," +
-            "bidder_id VARCHAR(50) NOT NULL," +
-            "bid_amount DOUBLE NOT NULL," +
-            "bid_time DATETIME NOT NULL" +
-        ")");
-            
-// ... Các bảng items, auction_sessions, bid_transactions ...
-        
-        dbStmt.close();
-        System.out.println("[MÁY CHỦ] ✓ Database đã khởi tạo hoàn tất");
-        
-    } catch (Exception e) {
-        System.err.println("[MÁY CHỦ] ✗ Lỗi khởi tạo database: " + e.getMessage());
-        e.printStackTrace();
-    }
+        Properties props = loadProperties();
+        String dbUrl      = props.getProperty("db.url", "jdbc:mysql://localhost:3306/auction_system");
+        String dbUsername = props.getProperty("db.username", "root");
+        String dbPassword = props.getProperty("db.password", "");
+
+        // Tạo database nếu chưa có (kết nối root không chỉ định DB)
+        String rootUrl = dbUrl.replaceAll("/auction_system.*", "/")
+                              + "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+        try (Connection conn = DriverManager.getConnection(rootUrl, dbUsername, dbPassword);
+             Statement stmt  = conn.createStatement()) {
+
+            stmt.executeUpdate("CREATE DATABASE IF NOT EXISTS auction_system");
+            System.out.println("[SERVER] ✓ Database 'auction_system' đã sẵn sàng.");
+
+        } catch (Exception e) {
+            System.err.println("[SERVER] ✗ Không thể tạo database: " + e.getMessage());
+        }
+
+        // Tạo bảng qua HikariCP pool (kết nối đúng vào auction_system)
+        try (Connection conn = DatabaseUtil.getInstance().getConnection();
+             Statement stmt  = conn.createStatement()) {
+
+            stmt.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id            VARCHAR(50)  PRIMARY KEY,
+                        username      VARCHAR(50)  NOT NULL UNIQUE,
+                        password      VARCHAR(255) NOT NULL,
+                        full_name     VARCHAR(100) NOT NULL,
+                        email         VARCHAR(100) NOT NULL UNIQUE,
+                        role          VARCHAR(20)  NOT NULL,
+                        balance       DOUBLE       DEFAULT 0,
+                        frozen_amount DOUBLE       DEFAULT 0
+                    )""");
+
+            stmt.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS items (
+                        id          VARCHAR(50)  PRIMARY KEY,
+                        name        VARCHAR(100) NOT NULL,
+                        description TEXT,
+                        init_price  DOUBLE       NOT NULL,
+                        category    VARCHAR(50)  NOT NULL
+                    )""");
+
+            stmt.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS auction_sessions (
+                        auction_id          VARCHAR(50) PRIMARY KEY,
+                        item_id             VARCHAR(50) NOT NULL,
+                        seller_id           VARCHAR(50) NOT NULL,
+                        start_time          DATETIME    NOT NULL,
+                        end_time            DATETIME    NOT NULL,
+                        status              VARCHAR(20) NOT NULL,
+                        winner_id           VARCHAR(50),
+                        current_highest_bid DOUBLE      DEFAULT 0
+                    )""");
+
+            stmt.executeUpdate("""
+                    CREATE TABLE IF NOT EXISTS bid_transactions (
+                        id         INT AUTO_INCREMENT PRIMARY KEY,
+                        auction_id VARCHAR(50) NOT NULL,
+                        bidder_id  VARCHAR(50) NOT NULL,
+                        bid_amount DOUBLE      NOT NULL,
+                        bid_time   DATETIME    NOT NULL
+                    )""");
+
+            // Thêm cột frozen_amount nếu DB cũ chưa có (migration an toàn)
+            try {
+                stmt.executeUpdate(
+                        "ALTER TABLE users ADD COLUMN frozen_amount DOUBLE DEFAULT 0");
+                System.out.println("[SERVER] ✓ Đã thêm cột frozen_amount vào bảng users.");
+            } catch (Exception ignored) {
+                // Cột đã tồn tại — bỏ qua lỗi ALTER TABLE
+            }
+
+            System.out.println("[SERVER] ✓ Database đã khởi tạo hoàn tất.");
+
+        } catch (Exception e) {
+            System.err.println("[SERVER] ✗ Lỗi khởi tạo bảng: " + e.getMessage());
+        }
     }
 
+    private Properties loadProperties() {
+        Properties props = new Properties();
+        try (InputStream in = getClass().getClassLoader()
+                .getResourceAsStream("config/application.properties")) {
+            if (in != null) props.load(in);
+        } catch (Exception e) {
+            System.err.println("[SERVER] Không đọc được properties: " + e.getMessage());
+        }
+        return props;
+    }
+
+    // -------------------------------------------------------------------------
+    // Entry point
+    // -------------------------------------------------------------------------
     public static void main(String[] args) {
-        int port = DEFAULT_PORT;
+        int port = (args.length > 0) ? Integer.parseInt(args[0]) : DEFAULT_PORT;
         try {
             new AuctionServer(port).start();
         } catch (IOException e) {
-            System.err.println("[MÁY CHỦ] Lỗi khi khởi động: " + e.getMessage());
+            System.err.println("[SERVER] ✗ Lỗi khởi động: " + e.getMessage());
         }
     }
 }

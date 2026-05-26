@@ -1,49 +1,42 @@
--- Database: auction_system
-CREATE DATABASE IF NOT EXISTS auction_system;
-USE auction_system;
+-- ============================================================
+--  Schema cho hệ thống đấu giá trực tuyến
+--  Chú ý: frozen_amount lưu số tiền đang bị tạm khóa của Bidder
+-- ============================================================
 
--- Table: users
 CREATE TABLE IF NOT EXISTS users (
-    id VARCHAR(50) PRIMARY KEY,
-    username VARCHAR(50) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    full_name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) NOT NULL UNIQUE,
-    role VARCHAR(20) NOT NULL,
-    balance DOUBLE DEFAULT 0
+    id            VARCHAR(50)  PRIMARY KEY,
+    username      VARCHAR(50)  NOT NULL UNIQUE,
+    password      VARCHAR(255) NOT NULL,
+    full_name     VARCHAR(100) NOT NULL,
+    email         VARCHAR(100) NOT NULL UNIQUE,
+    role          VARCHAR(20)  NOT NULL,
+    balance       DOUBLE       DEFAULT 0,
+    frozen_amount DOUBLE       DEFAULT 0
 );
 
--- Table: items
 CREATE TABLE IF NOT EXISTS items (
-    id VARCHAR(50) PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    id          VARCHAR(50)  PRIMARY KEY,
+    name        VARCHAR(100) NOT NULL,
     description TEXT,
-    init_price DOUBLE NOT NULL,
-    category VARCHAR(50) NOT NULL
+    init_price  DOUBLE       NOT NULL,
+    category    VARCHAR(50)  NOT NULL
 );
 
--- Table: auction_sessions
 CREATE TABLE IF NOT EXISTS auction_sessions (
-    auction_id VARCHAR(50) PRIMARY KEY,
-    item_id VARCHAR(50) NOT NULL,
-    seller_id VARCHAR(50) NOT NULL,
-    start_time DATETIME NOT NULL,
-    end_time DATETIME NOT NULL,
-    status VARCHAR(20) NOT NULL,
-    winner_id VARCHAR(50),
-    current_highest_bid DOUBLE DEFAULT 0,
-    FOREIGN KEY (item_id) REFERENCES items(id),
-    FOREIGN KEY (seller_id) REFERENCES users(id),
-    FOREIGN KEY (winner_id) REFERENCES users(id)
+    auction_id          VARCHAR(50) PRIMARY KEY,
+    item_id             VARCHAR(50) NOT NULL,
+    seller_id           VARCHAR(50) NOT NULL,
+    start_time          DATETIME    NOT NULL,
+    end_time            DATETIME    NOT NULL,
+    status              VARCHAR(20) NOT NULL,
+    winner_id           VARCHAR(50),
+    current_highest_bid DOUBLE      DEFAULT 0
 );
 
--- Table: bid_transactions
 CREATE TABLE IF NOT EXISTS bid_transactions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    auction_id VARCHAR(50) NOT NULL,
-    bidder_id VARCHAR(50) NOT NULL,
-    bid_amount DOUBLE NOT NULL,
-    bid_time DATETIME NOT NULL,
-    FOREIGN KEY (auction_id) REFERENCES auction_sessions(auction_id),
-    FOREIGN KEY (bidder_id) REFERENCES users(id)
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    auction_id  VARCHAR(50) NOT NULL,
+    bidder_id   VARCHAR(50) NOT NULL,
+    bid_amount  DOUBLE      NOT NULL,
+    bid_time    DATETIME    NOT NULL
 );

@@ -1,81 +1,108 @@
 package com.auction.server.util;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
 import java.io.InputStream;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 
-public class DatabaseUtil {
-    private static DatabaseUtil instance;
-    private Connection connection;
-    private String url;
-    private String username;
-    private String password;
-    private static final int MAX_RETRIES = 3;
+/**
+ * Singleton cung cấp Connection Pool (HikariCP) cho toàn bộ server.
+ *
+ * <p>Thay thế design cũ (một Connection duy nhất) vốn không thread-safe
+ * khi nhiều ClientHandler chạy song song.</p>
+ *
+ * <p>Mỗi lần gọi {@link #getConnection()} trả về một Connection riêng từ pool.
+ * Caller PHẢI đóng Connection bằng try-with-resources hoặc {@code conn.close()}
+ * để trả Connection về pool.</p>
+ */
+public final class DatabaseUtil {
 
+    private static volatile DatabaseUtil instance;
+    private final HikariDataSource dataSource;
+
+    // -------------------------------------------------------------------------
+    // Khởi tạo (private constructor — Singleton Pattern)
+    // -------------------------------------------------------------------------
     private DatabaseUtil() {
-        try {
-            Properties props = new Properties();
-            InputStream in = getClass().getClassLoader().getResourceAsStream("config/application.properties");
-            if (in != null) {
-                props.load(in);
-                this.url = props.getProperty("db.url");
-                this.username = props.getProperty("db.username");
-                this.password = props.getProperty("db.password");
-            } else {
-                throw new RuntimeException("Cannot find config/application.properties");
-            }
-            
-            // Load driver explicitly
-            Class.forName("com.mysql.cj.jdbc.Driver");
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("Failed to initialize DatabaseUtil", e);
-        }
+        Properties props = loadProperties();
+
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(props.getProperty("db.url",
+                "jdbc:mysql://localhost:3306/auction_system?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC"));
+        config.setUsername(props.getProperty("db.username", "root"));
+        config.setPassword(props.getProperty("db.password", ""));
+
+        // Kích thước pool: tối đa 20, giữ sẵn 5 connection nhàn rỗi
+        config.setMaximumPoolSize(20);
+        config.setMinimumIdle(5);
+
+        // Timeout đợi lấy connection từ pool (30 giây)
+        config.setConnectionTimeout(30_000);
+        // Đóng connection nhàn rỗi sau 10 phút
+        config.setIdleTimeout(600_000);
+        // Vòng đời tối đa của mỗi connection (30 phút) — tránh stale connection
+        config.setMaxLifetime(1_800_000);
+        // Câu SQL kiểm tra connection còn sống không
+        config.setConnectionTestQuery("SELECT 1");
+
+        config.setPoolName("AuctionPool");
+
+        this.dataSource = new HikariDataSource(config);
+        System.out.println("[DATABASE] ✓ Connection Pool khởi tạo thành công (max=" + config.getMaximumPoolSize() + ")");
     }
 
-    public static synchronized DatabaseUtil getInstance() {
+    // -------------------------------------------------------------------------
+    // Double-Checked Locking Singleton
+    // -------------------------------------------------------------------------
+    public static DatabaseUtil getInstance() {
         if (instance == null) {
-            instance = new DatabaseUtil();
+            synchronized (DatabaseUtil.class) {
+                if (instance == null) {
+                    instance = new DatabaseUtil();
+                }
+            }
         }
         return instance;
     }
 
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
+
+    /**
+     * Lấy một Connection từ pool.
+     * <strong>Phải đóng Connection sau khi dùng xong</strong> (dùng try-with-resources).
+     */
     public Connection getConnection() throws SQLException {
-        // Kiểm tra connection có còn sống không
-        if (connection == null || connection.isClosed()) {
-            // Tạo connection mới với retry logic
-            for (int i = 0; i < MAX_RETRIES; i++) {
-                try {
-                    connection = DriverManager.getConnection(url, username, password);
-                    System.out.println("[DATABASE] ✓ Kết nối thành công");
-                    return connection;
-                } catch (SQLException e) {
-                    System.err.println("[DATABASE] ⚠ Lần thử " + (i + 1) + "/" + MAX_RETRIES + " - " + e.getMessage());
-                    if (i < MAX_RETRIES - 1) {
-                        try {
-                            Thread.sleep(1000);  // Đợi 1 giây rồi thử lại
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                        }
-                    } else {
-                        throw e;
-                    }
-                }
-            }
-        }
-        return connection;
+        return dataSource.getConnection();
     }
 
-    public void closeConnection() {
-        try {
-            if (connection != null && !connection.isClosed()) {
-                connection.close();
-                System.out.println("[DATABASE] Đóng kết nối");
-            }
-        } catch (SQLException e) {
-            System.err.println("[DATABASE] Lỗi đóng kết nối: " + e.getMessage());
+    /** Đóng toàn bộ pool — gọi khi server tắt. */
+    public void shutdown() {
+        if (!dataSource.isClosed()) {
+            dataSource.close();
+            System.out.println("[DATABASE] Pool đã đóng.");
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+    private Properties loadProperties() {
+        Properties props = new Properties();
+        try (InputStream in = getClass().getClassLoader()
+                .getResourceAsStream("config/application.properties")) {
+            if (in != null) {
+                props.load(in);
+            } else {
+                System.err.println("[DATABASE] ⚠ Không tìm thấy application.properties, dùng giá trị mặc định.");
+            }
+        } catch (Exception e) {
+            System.err.println("[DATABASE] ⚠ Lỗi đọc properties: " + e.getMessage());
+        }
+        return props;
     }
 }

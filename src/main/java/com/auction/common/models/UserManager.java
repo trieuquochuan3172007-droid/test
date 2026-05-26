@@ -1,38 +1,47 @@
 package com.auction.common.models;
 
+/**
+ * Singleton lưu thông tin phiên đăng nhập hiện tại trên client.
+ *
+ * <p>Không lưu xuống file — chỉ tồn tại trong bộ nhớ khi ứng dụng đang chạy.
+ * Khi client tắt hoặc đăng xuất, trạng thái bị xóa.</p>
+ *
+ * <p>Singleton Pattern — Double-Checked Locking.</p>
+ */
 public class UserManager {
-    private static UserManager instance;
+
+    private static volatile UserManager instance;
     private User currentUser;
 
-    private UserManager() {
-        // Đã xóa bỏ logic đọc ghi file users.dat cũ
-    }
+    private UserManager() {}
 
-    public static synchronized UserManager getInstance() {
+    public static UserManager getInstance() {
         if (instance == null) {
-            instance = new UserManager();
+            synchronized (UserManager.class) {
+                if (instance == null) instance = new UserManager();
+            }
         }
         return instance;
     }
 
-    public User getCurrentUser() {
-        return currentUser;
-    }
+    // -------------------------------------------------------------------------
+    // Session management
+    // -------------------------------------------------------------------------
 
-    public void setCurrentUser(User currentUser) {
-        this.currentUser = currentUser;
-    }
-    
-    public void logout() {
-        this.currentUser = null;
-    }
+    /** Lấy người dùng đang đăng nhập; null nếu chưa đăng nhập. */
+    public User getCurrentUser() { return currentUser; }
 
-    public long generateId() {
-        return System.currentTimeMillis();
-    }
+    /** Đặt người dùng sau khi đăng nhập thành công. */
+    public void setCurrentUser(User user) { this.currentUser = user; }
 
-    public boolean register(User user) {
-        System.out.println("Registered user: " + user.getUsername());
-        return true;
+    /** Đăng xuất — xóa thông tin người dùng hiện tại. */
+    public void logout() { this.currentUser = null; }
+
+    /** Kiểm tra người dùng có đang đăng nhập không. */
+    public boolean isLoggedIn() { return currentUser != null; }
+
+    /** Sinh ID duy nhất dựa trên timestamp hiện tại. */
+    public String generateId() {
+        return String.valueOf(System.currentTimeMillis());
     }
 }
