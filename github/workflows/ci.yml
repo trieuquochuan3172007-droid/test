@@ -15,7 +15,7 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: Kien2007zz@
+          MYSQL_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
           MYSQL_DATABASE: auction_system
         ports:
           - 3306:3306
@@ -26,7 +26,7 @@ jobs:
           --health-retries=10
 
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -36,31 +36,31 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # Ghi đè TOÀN BỘ file (tránh lỗi conflict markers còn sót)
+      # ─── Ghi file cấu hình từ GitHub Secrets (KHÔNG hardcode mật khẩu) ───
       - name: Patch application.properties
         run: |
-          cat > src/main/resources/config/application.properties << EOF
-          # MySQL Connection configurations
-          db.url=jdbc:mysql://127.0.0.1:3306/auction_system?allowPublicKeyRetrieval=true&useSSL=false
+          cat > src/main/resources/config/application.properties << PROPS
+          db.url=jdbc:mysql://127.0.0.1:3306/auction_system?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
           db.username=root
-          db.password=Kien2007zz@
-          EOF
-          echo "[CI] application.properties:"
-          cat src/main/resources/config/application.properties
+          db.password=${{ secrets.DB_ROOT_PASSWORD }}
+          PROPS
+          echo "[CI] application.properties đã được ghi (password ẩn)"
 
+      # ─── Khởi tạo schema (bao gồm cột frozen_amount) ───
       - name: Init database schema
         env:
-          MYSQL_PWD: Kien2007zz@
+          MYSQL_PWD: ${{ secrets.DB_ROOT_PASSWORD }}
         run: |
           mysql -h 127.0.0.1 -u root auction_system << 'SQL'
           CREATE TABLE IF NOT EXISTS users (
-            id          VARCHAR(50)  PRIMARY KEY,
-            username    VARCHAR(50)  NOT NULL UNIQUE,
-            password    VARCHAR(255) NOT NULL,
-            full_name   VARCHAR(100) NOT NULL,
-            email       VARCHAR(100) NOT NULL UNIQUE,
-            role        VARCHAR(20)  NOT NULL,
-            balance     DOUBLE       DEFAULT 0
+            id            VARCHAR(50)  PRIMARY KEY,
+            username      VARCHAR(50)  NOT NULL UNIQUE,
+            password      VARCHAR(255) NOT NULL,
+            full_name     VARCHAR(100) NOT NULL,
+            email         VARCHAR(100) NOT NULL UNIQUE,
+            role          VARCHAR(20)  NOT NULL,
+            balance       DOUBLE       DEFAULT 0,
+            frozen_amount DOUBLE       DEFAULT 0
           );
           CREATE TABLE IF NOT EXISTS items (
             id          VARCHAR(50)  PRIMARY KEY,
@@ -87,26 +87,26 @@ jobs:
             bid_time    DATETIME    NOT NULL
           );
           SQL
-          echo "[CI] Schema khởi tạo xong"
+          echo "[CI] Schema khởi tạo hoàn tất"
 
       - name: Compile
         run: mvn compile --no-transfer-progress
 
-      - name: Test
+      - name: Run Tests
         run: mvn test --no-transfer-progress
 
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-report
+          name: test-report-${{ github.run_number }}
           path: target/surefire-reports/
           retention-days: 14
 
       - name: Package JAR
         run: mvn package -DskipTests --no-transfer-progress
 
-      - name: Upload JAR
+      - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: auction-system-${{ github.sha }}

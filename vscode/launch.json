@@ -3,6 +3,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "Main",
+            "request": "launch",
+            "mainClass": "com.auction.Main",
+            "projectName": "bai-tap-lon-auction"
+        },
+        {
+            "type": "java",
             "name": "AuctionServer",
             "request": "launch",
             "mainClass": "com.auction.server.network.AuctionServer",
