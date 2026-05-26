@@ -404,3 +404,74 @@
 .axis-tick-mark, .axis-minor-tick-mark {
     -fx-stroke: transparent;
 }
+
+/* New Login Design */
+.login-page-new {
+    -fx-background-color: linear-gradient(to bottom right, #091325, #0f172a);
+}
+.brand-title-new {
+    -fx-text-fill: white;
+    -fx-font-size: 42px;
+    -fx-font-weight: 800;
+}
+.brand-subtitle {
+    -fx-text-fill: #38bdf8;
+    -fx-font-size: 16px;
+    -fx-font-weight: 800;
+    -fx-letter-spacing: 1.5px;
+}
+.welcome-title {
+    -fx-text-fill: white;
+    -fx-font-size: 48px;
+    -fx-font-weight: 900;
+}
+.welcome-subtitle {
+    -fx-text-fill: #cbd5e1;
+    -fx-font-size: 20px;
+}
+.login-form-container-new {
+    -fx-padding: 0;
+}
+.field-label-new {
+    -fx-text-fill: #cbd5e1;
+    -fx-font-size: 16px;
+}
+.input-container {
+    -fx-background-color: #1e293b;
+    -fx-background-radius: 12;
+    -fx-padding: 0 20 0 20;
+}
+.text-input-new {
+    -fx-background-color: transparent;
+    -fx-text-fill: white;
+    -fx-prompt-text-fill: #64748b;
+    -fx-font-size: 16px;
+    -fx-padding: 18 0 18 0;
+    -fx-background-insets: 0;
+}
+.text-input-new:focused {
+    -fx-background-color: transparent;
+}
+.forgot-link {
+    -fx-text-fill: #60a5fa;
+    -fx-font-size: 15px;
+    -fx-underline: false;
+}
+.btn-login-new {
+    -fx-background-color: linear-gradient(to right, #10b981, #059669);
+    -fx-text-fill: white;
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 12;
+    -fx-padding: 16;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(three-pass-box, rgba(16, 185, 129, 0.4), 15, 0, 0, 5);
+}
+.btn-login-new:hover {
+    -fx-background-color: linear-gradient(to right, #34d399, #10b981);
+}
+.link-register {
+    -fx-text-fill: #38bdf8;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
